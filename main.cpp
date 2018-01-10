@@ -18,7 +18,7 @@ void signal_handler(int signal) { shutdown_handler(signal); }
 
 int main(int argc, char *argv[]) {
 
-  std::signal(SIGINT, signal_handler);
+  //std::signal(SIGINT, signal_handler);
 
   TCPServer server;
   server.initialize(1312);
@@ -28,13 +28,13 @@ int main(int argc, char *argv[]) {
 
   shutdown_handler = [&](int signal) {
     __message("Server shutdown...");
-     server.shutdown();
+    server.shutdown();
   };
 
   populateProtocolHandling(server, dispatcher, handler);
 
   server.accept([&] {
-    while (dispatcher.dispatch(server.recive()));
+    while (dispatcher.dispatch(server.recive(true, true)));
   });
 
   return 0;

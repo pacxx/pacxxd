@@ -1,10 +1,11 @@
+#include <array>
 #include <asio.hpp>
 #include <iostream>
-#include <array>
+
 
 #include <pacxx/detail/IRRuntime.h>
 
-const char* module = R"LLVM(
+const char *module = R"LLVM(
 ; ModuleID = 'kernel.bc'
 source_filename = "llvm-link"
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -237,175 +238,177 @@ attributes #7 = { nounwind readnone }
 !8 = !{!""}
 )LLVM";
 
-
 using asio::ip::tcp;
 
-std::unique_ptr<asio::io_service> _service; 
+std::unique_ptr<asio::io_service> _service;
 std::unique_ptr<asio::ip::tcp::socket> _socket;
 
-    std::string send_message(std::string message){
-      std::string answer;
-      asio::streambuf buffer;
-      asio::write(*_socket, asio::buffer(message + "\r"));
-      std::cout << message << " -> ";
-      asio::read_until(*_socket, buffer, '\r');
-      std::istream is(&buffer);
-      is >> answer;
-      std::cout << answer << std::endl;
-      return answer;
-    }
-
-    std::string send_data(const void* data, size_t size){
-      std::string answer;
-      asio::streambuf buffer;
-      asio::write(*_socket, asio::buffer(data, size));
-      std::cout << data << " -> ";
-      asio::read_until(*_socket, buffer, '\r');
-      std::istream is(&buffer);
-      is >> answer;
-      std::cout << answer << std::endl;
-      return answer;
-    }
-
-    std::string read_data(void* ptr, size_t size){
-      asio::read(*_socket, asio::buffer(ptr, size), asio::transfer_exactly(size));
-      return send_message("ACK");
-    }
-
-void connectToDeamon(const std::string& host, const std::string& port){
-    _service.reset(new asio::io_service());
-    tcp::resolver resolver(*_service);
-    tcp::resolver::query query(host, port);
-    tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
-
-    _socket.reset(new asio::ip::tcp::socket(*_service));
-    asio::connect(*_socket, endpoint_iterator);
-
-    send_message("HELLO");
+std::string send_message(std::string message) {
+  std::string answer;
+  asio::streambuf buffer;
+  asio::write(*_socket, asio::buffer(message + "\r"));
+  std::cout << message << " -> ";
+  asio::read_until(*_socket, buffer, '\r');
+  std::istream is(&buffer);
+  is >> answer;
+  std::cout << answer << std::endl;
+  return answer;
 }
 
-
-void createRemoteBackend(pacxx::v2::IRRuntime::RuntimeKind kind, const char* llvm, size_t size){
-    std::string rtName; 
-    using namespace pacxx::v2;
-    switch(kind){
-      case IRRuntime::RK_CUDA: 
-        rtName = "CUDA"; 
-        break; 
-      case IRRuntime::RK_Native: 
-        rtName = "NATIVE"; 
-        break; 
-      case IRRuntime::RK_HIP: 
-        rtName = "HIP"; 
-        break; 
-    }
-
-    send_message(rtName);
-    send_message("LLVM");
-    send_message(std::to_string(size));
-    send_data(llvm, size);
+std::string send_data(const void *data, size_t size) {
+  std::string answer;
+  asio::streambuf buffer;
+  asio::write(*_socket, asio::buffer(data, size));
+  std::cout << data << " -> ";
+  asio::read_until(*_socket, buffer, '\r');
+  std::istream is(&buffer);
+  is >> answer;
+  std::cout << answer << std::endl;
+  return answer;
 }
 
-  void* allocateRemoteMemory(size_t size){
-    send_message("ALLOC");
-    return reinterpret_cast<void*>(std::stoul(send_message(std::to_string(size))));
+std::string read_data(void *ptr, size_t size) {
+  asio::read(*_socket, asio::buffer(ptr, size), asio::transfer_exactly(size));
+  return send_message("ACK");
+}
+
+void connectToDeamon(const std::string &host, const std::string &port) {
+  _service.reset(new asio::io_service());
+  tcp::resolver resolver(*_service);
+  tcp::resolver::query query(host, port);
+  tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+
+  _socket.reset(new asio::ip::tcp::socket(*_service));
+  asio::connect(*_socket, endpoint_iterator);
+
+  send_message("HELLO");
+}
+
+void createRemoteBackend(pacxx::v2::IRRuntime::RuntimeKind kind,
+                         const char *llvm, size_t size) {
+  std::string rtName;
+  using namespace pacxx::v2;
+  switch (kind) {
+  case IRRuntime::RK_CUDA:
+    rtName = "CUDA";
+    break;
+  case IRRuntime::RK_Native:
+    rtName = "NATIVE";
+    break;
+  case IRRuntime::RK_HIP:
+    rtName = "HIP";
+    break;
   }
 
-  void freeRemoteMemory(void* ptr){
-    send_message("FREE");
-    send_message(std::to_string(reinterpret_cast<uint64_t>(ptr)));
-  }
+  send_message(rtName);
+  send_message("LLVM");
+  send_message(std::to_string(size));
+  send_data(llvm, size);
+}
 
-  void uploadToRemoteMemory(void* dest, void* src, size_t size){
-    send_message("UPLOAD");
-    send_message(std::to_string(reinterpret_cast<uint64_t>(dest)));
-    send_message(std::to_string(size));
-    send_data(src, size);
-  }
+void *allocateRemoteMemory(size_t size) {
+  send_message("ALLOC");
+  return reinterpret_cast<void *>(
+      std::stoul(send_message(std::to_string(size))));
+}
 
-  void downloadFromRemoteMemory(void* dest, void* src, size_t size){
-    send_message("DOWNLOAD");
-    send_message(std::to_string(reinterpret_cast<uint64_t>(src)));
-    send_message(std::to_string(size));
-    auto answer = read_data(dest, size);
-  }
+void freeRemoteMemory(void *ptr) {
+  send_message("FREE");
+  send_message(std::to_string(reinterpret_cast<uint64_t>(ptr)));
+}
 
-struct dim3{
-  dim3(unsigned int x, unsigned int y, unsigned int z) : x(x), y(y), z(z){}
-  unsigned int x, y, z; 
+void uploadToRemoteMemory(void *dest, void *src, size_t size) {
+  send_message("UPLOAD");
+  send_message(std::to_string(reinterpret_cast<uint64_t>(dest)));
+  send_message(std::to_string(size));
+  send_data(src, size);
+}
+
+void downloadFromRemoteMemory(void *dest, void *src, size_t size) {
+  send_message("DOWNLOAD");
+  send_message(std::to_string(reinterpret_cast<uint64_t>(src)));
+  send_message(std::to_string(size));
+  auto answer = read_data(dest, size);
+}
+
+struct dim3 {
+  dim3(unsigned int x, unsigned int y, unsigned int z) : x(x), y(y), z(z) {}
+  unsigned int x, y, z;
 };
 
-struct KernelConfiguration{
+struct KernelConfiguration {
   KernelConfiguration(dim3 b, dim3 t) : threads(t), blocks(b) {}
-  dim3 threads, blocks; 
+  dim3 threads, blocks;
 };
 
-  void launchRemoteKernel(const std::string& name, void* args, size_t size, KernelConfiguration config){
-    send_message("LAUNCH");
-    send_message(name);
-    send_message(std::to_string(config.blocks.x));
-    send_message(std::to_string(config.blocks.y));
-    send_message(std::to_string(config.blocks.z));
-    send_message(std::to_string(config.threads.x));
-    send_message(std::to_string(config.threads.y));
-    send_message(std::to_string(config.threads.z));
-    send_message(std::to_string(size));
-    send_data(args, size);
-  }
-
+void launchRemoteKernel(const std::string &name, void *args, size_t size,
+                        KernelConfiguration config) {
+  send_message("LAUNCH");
+  send_message(name);
+  send_message(std::to_string(config.blocks.x));
+  send_message(std::to_string(config.blocks.y));
+  send_message(std::to_string(config.blocks.z));
+  send_message(std::to_string(config.threads.x));
+  send_message(std::to_string(config.threads.y));
+  send_message(std::to_string(config.threads.z));
+  send_message(std::to_string(size));
+  send_data(args, size);
+}
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-      std::cerr << "Usage: client <host>" << std::endl;
-      return 1;
-    }
+  if (argc != 2) {
+    std::cerr << "Usage: client <host>" << std::endl;
+    return 1;
+  }
 
-    connectToDeamon(argv[1], "1312");
+  connectToDeamon(argv[1], "1312");
 
-    std::string llvm(module); 
-    createRemoteBackend(pacxx::v2::IRRuntime::RK_Native, llvm.data(), llvm.size());
+  std::string llvm(module);
+  createRemoteBackend(pacxx::v2::IRRuntime::RK_Native, llvm.data(),
+                      llvm.size());
 
-    size_t size = 128 * sizeof(int);
-    
-    auto ptrA = allocateRemoteMemory(size);
-    auto ptrB = allocateRemoteMemory(size);
-    auto ptrC = allocateRemoteMemory(size);
+  size_t size = 128 * sizeof(int);
 
-    std::vector<int> data(128);
-    std::fill(data.begin(), data.end(), 1);
-    uploadToRemoteMemory(ptrA, data.data(), size);
+  auto ptrA = allocateRemoteMemory(size);
+  auto ptrB = allocateRemoteMemory(size);
+  auto ptrC = allocateRemoteMemory(size);
 
-    std::fill(data.begin(), data.end(), 2);
-    uploadToRemoteMemory(ptrB, data.data(), size);
+  std::vector<int> data(128);
+  std::fill(data.begin(), data.end(), 1);
+  uploadToRemoteMemory(ptrA, data.data(), size);
 
-    std::fill(data.begin(), data.end(), 0);
-    uploadToRemoteMemory(ptrC, data.data(), size);
+  std::fill(data.begin(), data.end(), 2);
+  uploadToRemoteMemory(ptrB, data.data(), size);
 
-    struct _args{
-      size_t N; 
-      void* A;
-      void* B;
-      void* C;
-    } args;
+  std::fill(data.begin(), data.end(), 0);
+  uploadToRemoteMemory(ptrC, data.data(), size);
 
-    args.N = data.size(); 
-    args.A = ptrC; 
-    args.B = ptrB;
-    args.C = ptrA;
+  struct _args {
+    size_t N;
+    void *A;
+    void *B;
+    void *C;
+  } args;
 
-    launchRemoteKernel("ZL19test_vadd_low_leveliPPcE3$_0", &args, sizeof(_args), {{1, 1, 1}, {128, 1, 1}});
+  args.N = data.size();
+  args.A = ptrC;
+  args.B = ptrB;
+  args.C = ptrA;
 
-    downloadFromRemoteMemory(data.data(), ptrC, size);
+  launchRemoteKernel("ZL19test_vadd_low_leveliPPcE3$_0", &args, sizeof(_args),
+                     {{1, 1, 1}, {128, 1, 1}});
 
-    for(auto v : data)
-      std::cout << v; 
-    std::cout << std::endl;
+  downloadFromRemoteMemory(data.data(), ptrC, size);
 
-    freeRemoteMemory(ptrA);
-    freeRemoteMemory(ptrB);
-    freeRemoteMemory(ptrC);
+  for (auto v : data)
+    std::cout << v;
+  std::cout << std::endl;
 
-    send_message("BYE");
+  freeRemoteMemory(ptrA);
+  freeRemoteMemory(ptrB);
+  freeRemoteMemory(ptrC);
+
+  send_message("BYE");
 
   return 0;
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include "Semaphore.h"
+#include "Log.h"
 
 #include <asio.hpp>
 #include <memory>
@@ -19,13 +20,17 @@ public:
   template <typename L>
   void accept(L handler) { 
     while (_accept){
-      std::async(std::launch::async, [&]{
+    /*  std::async(std::launch::async, [this, &handler]{
+
       _acceptor->async_accept(*_socket, 
-      [&](const auto& error) mutable{
+      [&](const auto& error) {
         if (!error){ 
+          __message("starting message handling...");
           handler();
         }
-      });}); 
+      });}); */
+      _acceptor->accept(*_socket);
+      handler();
     }
   }
 

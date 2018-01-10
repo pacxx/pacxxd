@@ -26,7 +26,9 @@ void TCPServer::shutdown(){
   _accept = false; 
   _acceptor->cancel(); 
   _acceptor->close();
+  _acceptor.reset();
   _service->stop();
+  _service.reset();
 }
 
 void TCPServer::send(const std::string& message) {
@@ -44,15 +46,18 @@ std::string TCPServer::recive(bool auto_ack, bool no_timeout) {
   asio::streambuf buffer;
   asio::error_code error;
   if (no_timeout){
+    __message("blocking read");
     asio::read_until(*_socket, buffer, '\r');
   }
   else {
+    __message("non-blocking read");
     sema.reset();
     asio::async_read_until(*_socket, buffer, '\r', 
         [this](auto& ec, size_t recived) {
             // if the timeout runs out do nothing
             if (ec == asio::error::operation_aborted)
               return;
+              __message("notify");
             sema.signal();
         });
 

@@ -364,7 +364,7 @@ int main(int argc, char *argv[]) {
   connectToDeamon(argv[1], "1312");
 
   std::string llvm(module);
-  createRemoteBackend(pacxx::v2::IRRuntime::RK_Native, llvm.data(),
+  createRemoteBackend(pacxx::v2::IRRuntime::RK_HIP, llvm.data(),
                       llvm.size());
 
   size_t size = 128 * sizeof(int);

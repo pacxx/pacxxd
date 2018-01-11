@@ -46,18 +46,15 @@ std::string TCPServer::recive(bool auto_ack, bool no_timeout) {
   asio::streambuf buffer;
   asio::error_code error;
   if (no_timeout){
-    __message("blocking read");
     asio::read_until(*_socket, buffer, '\r');
   }
   else {
-    __message("non-blocking read");
     sema.reset();
     asio::async_read_until(*_socket, buffer, '\r', 
         [this](auto& ec, size_t recived) {
             // if the timeout runs out do nothing
             if (ec == asio::error::operation_aborted)
               return;
-              __message("notify");
             sema.signal();
         });
 
@@ -71,7 +68,6 @@ std::string TCPServer::recive(bool auto_ack, bool no_timeout) {
 
   std::istream is(&buffer);
   is >> message;
-  __debug("network message recived: ", message);
   if (auto_ack)
     send("ACK"); // send ACK to the client to acknoledge the message
   return message;

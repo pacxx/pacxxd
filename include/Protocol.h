@@ -47,7 +47,6 @@ namespace pacxxd{
 
     dispatcher.register_handler("FREE", [&]{
       auto message = server.recive(false); 
-      std::cout << "ERROR: " << message << std::endl;
       auto ptr = reinterpret_cast<void*>(std::stoul(message)); 
       handler.freeMemory(ptr);
       server.send("ACK");
@@ -68,7 +67,6 @@ namespace pacxxd{
       auto size = std::stoul(server.recive()); 
       std::vector<char> bytes(size);
       bytes.resize(size);
-      std::cout << "sending " << bytes.size() << " bytes" << std::endl;
       handler.downloadData(bytes.data(), ptr, size);
       server.send(bytes);
       dispatcher.dispatch(server.recive());
